@@ -39,7 +39,7 @@ import (
 
 const (
 	// DefaultDeviceName specifies name of WireGuard network device
-	DefaultDeviceName = "wg0"
+	DefaultDeviceName = "SYNTROPY_PUBLIC"
 
 	// PublicKey is name (key) of publicKey entry in back-end map
 	PublicKey = "publicKey"
