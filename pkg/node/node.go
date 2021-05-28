@@ -1,5 +1,7 @@
 /*
-© 2021 Red Hat, Inc. and others
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,18 +26,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
-func GetLocalNode(cfg *rest.Config) (*v1.Node, error) {
+func GetLocalNode(clientset kubernetes.Interface) (*v1.Node, error) {
 	nodeName, ok := os.LookupEnv("NODE_NAME")
 	if !ok {
 		return nil, errors.New("error reading the NODE_NAME from the environment")
-	}
-
-	clientset, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		return nil, errors.Wrapf(err, "creating Kubernetes clientset")
 	}
 
 	node, err := clientset.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})

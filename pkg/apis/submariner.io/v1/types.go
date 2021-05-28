@@ -1,5 +1,7 @@
 /*
-© 2021 Red Hat, Inc. and others
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +21,7 @@ import (
 	"fmt"
 	"net"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -84,10 +87,19 @@ const (
 	GatewayConfigLabelPrefix = "gateway.submariner.io/"
 	UDPPortConfig            = "udp-port"
 	NATTDiscoveryPortConfig  = "natt-discovery-port"
+	PublicIP                 = "public-ip"
 )
 
 const (
 	DefaultNATTDiscoveryPort = "4490"
+)
+
+// Valid PublicIP resolvers.
+const (
+	IPv4         = "ipv4" // ipv4:1.2.3.4
+	LoadBalancer = "lb"   // lb:external-gw-lb
+	API          = "api"  // api:api.ipify.org
+	DNS          = "dns"  // dns:mygateway.dns.name.com
 )
 
 // BackendConfig entries which aren't configured via labels, but exposed from the endpoints
@@ -99,6 +111,7 @@ const (
 var ValidGatewayNodeConfig = []string{
 	UDPPortConfig,
 	NATTDiscoveryPortConfig,
+	PublicIP,
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -270,4 +283,61 @@ type ClusterGlobalEgressIPList struct {
 	metav1.ListMeta `json:"metadata"`
 
 	Items []ClusterGlobalEgressIP `json:"items"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GlobalIngressIP struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of desired behavior of GlobalIngressIP object.
+	Spec GlobalIngressIPSpec `json:"spec"`
+
+	// Observed status of GlobalIngressIP. Its a read-only field.
+	// +optional
+	Status GlobalIngressIPStatus `json:"status,omitempty"`
+}
+
+type GlobalIngressIPSpec struct {
+	// Specifies the type of the entity targeted by this object.
+	Target TargetType `json:"target"`
+
+	// The reference to a targeted Service, if applicable.
+	// +Optional
+	ServiceRef *corev1.LocalObjectReference `json:"serviceRef,omitempty"`
+
+	// The reference to a targeted Pod, if applicable.
+	// +Optional
+	PodRef *corev1.LocalObjectReference `json:"podRef,omitempty"`
+}
+
+type TargetType string
+
+const (
+	ClusterIPService   TargetType = "ClusterIPService"
+	HeadlessServicePod TargetType = "HeadlessServicePod"
+)
+
+type GlobalIngressIPStatus struct {
+	// +optional
+	// +patchStrategy=merge
+	// +patchMergeKey=type
+	// +listType=map
+	// +listMapKey=type
+	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type"`
+
+	// The GlobalIP allocated to this object.
+	// +optional
+	AllocatedIP string `json:"allocatedIP"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type GlobalIngressIPList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []GlobalIngressIP `json:"items"`
 }

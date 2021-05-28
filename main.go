@@ -1,5 +1,7 @@
 /*
-© 2021 Red Hat, Inc. and others
+SPDX-License-Identifier: Apache-2.0
+
+Copyright Contributors to the Submariner project.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -52,9 +54,7 @@ import (
 	"github.com/submariner-io/submariner/pkg/controllers/tunnel"
 	"github.com/submariner-io/submariner/pkg/endpoint"
 	"github.com/submariner-io/submariner/pkg/natdiscovery"
-	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/types"
-	"github.com/submariner-io/submariner/pkg/util"
 )
 
 var (
@@ -110,9 +110,9 @@ func main() {
 		klog.Fatalf("Error creating submariner clientset: %s", err.Error())
 	}
 
-	localNode, err := node.GetLocalNode(cfg)
+	k8sClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		klog.Fatalf("Error getting information on the local node: %s", err.Error())
+		klog.Fatalf("Error creating Kubernetes clientset: %s", err.Error())
 	}
 
 	klog.Info("Creating the cable engine")
@@ -125,7 +125,7 @@ func main() {
 
 	submSpec.CableDriver = strings.ToLower(submSpec.CableDriver)
 
-	localEndpoint, err := endpoint.GetLocal(submSpec, util.GetLocalIP(), localNode)
+	localEndpoint, err := endpoint.GetLocal(submSpec, k8sClient)
 
 	if err != nil {
 		klog.Fatalf("Error creating local endpoint object from %#v: %v", submSpec, err)
