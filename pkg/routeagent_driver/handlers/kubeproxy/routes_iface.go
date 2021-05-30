@@ -29,6 +29,7 @@ import (
 
 	"github.com/submariner-io/admiral/pkg/log"
 
+	"github.com/submariner-io/submariner/pkg/cable/syntropy"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	"github.com/submariner-io/submariner/pkg/routeagent_driver/constants"
 )
@@ -106,6 +107,13 @@ func (kp *SyncHandler) configureRoute(remoteSubnet string, operation Operation, 
 			ifaceIndex = wg.Index
 		} else {
 			klog.Errorf("Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
+		}
+	}
+	if kp.localCableDriver == "syntropy" {
+		if wg, err := net.InterfaceByName(syntropy.DefaultDeviceName); err == nil {
+			ifaceIndex = wg.Index
+		} else {
+			klog.Errorf("Syntropy interface %s not found on the node.", syntropy.DefaultDeviceName)
 		}
 	}
 

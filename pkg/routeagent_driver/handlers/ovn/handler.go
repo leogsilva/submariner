@@ -26,6 +26,7 @@ import (
 
 	submV1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	cableCleanup "github.com/submariner-io/submariner/pkg/cable/cleanup"
+	"github.com/submariner-io/submariner/pkg/cable/syntropy"
 	"github.com/submariner-io/submariner/pkg/cable/wireguard"
 	clientset "github.com/submariner-io/submariner/pkg/client/clientset/versioned"
 	"github.com/submariner-io/submariner/pkg/event"
@@ -86,6 +87,11 @@ func (ovn *Handler) LocalEndpointCreated(endpoint *submV1.Endpoint) error {
 		//NOTE: This assumes that LocalEndpointCreated happens before than TransitionToGatewayNode
 		if routingInterface, err = net.InterfaceByName(wireguard.DefaultDeviceName); err != nil {
 			return errors.Wrapf(err, "Wireguard interface %s not found on the node.", wireguard.DefaultDeviceName)
+		}
+	} else if endpoint.Spec.Backend == "syntropy" {
+		//NOTE: This assumes that L}ocalEndpointCreated happens before than TransitionToGatewayNode
+		if routingInterface, err = net.InterfaceByName(syntropy.DefaultDeviceName); err != nil {
+			return errors.Wrapf(err, "Syntropy interface %s not found on the node.", syntropy.DefaultDeviceName)
 		}
 	} else {
 		if routingInterface, err = util.GetDefaultGatewayInterface(); err != nil {
