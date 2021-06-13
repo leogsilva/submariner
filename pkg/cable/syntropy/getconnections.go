@@ -40,19 +40,12 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 
 	for i := range d.Peers {
 		key := d.Peers[i].PublicKey
-		connection, err := w.connectionByKey(&key)
-		if err != nil {
-			klog.Warningf("Found unknown peer with key %s, removing", key)
 
-			if err := w.removePeer(&key); err != nil {
-				klog.Errorf("Could not delete WireGuard peer with key %s, ignoring: %v", key, err)
-			}
-
-			continue
+		connection, _ := w.connectionByKey(&key)
+		if connection != nil {
+			w.updateConnectionForPeer(&d.Peers[i], connection)
+			connections = append(connections, *connection.DeepCopy())
 		}
-
-		w.updateConnectionForPeer(&d.Peers[i], connection)
-		connections = append(connections, *connection.DeepCopy())
 	}
 
 	return connections, nil
@@ -60,7 +53,9 @@ func (w *wireguard) GetConnections() ([]v1.Connection, error) {
 
 func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 	for cid, con := range w.connections {
+		klog.Infof("Reading connection info: %v", con)
 		if k, err := keyFromSpec(&con.Endpoint); err == nil {
+			klog.Infof("Comparing %s with %s", key.String(), k.String())
 			if key.String() == k.String() {
 				return con, nil
 			}
@@ -69,7 +64,7 @@ func (w *wireguard) connectionByKey(key *wgtypes.Key) (*v1.Connection, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("connection not found for key %s", key)
+	return nil, fmt.Errorf("%d connection found. Not found for key %s", len(w.connections), key)
 }
 
 // update logic, based on delta from last check

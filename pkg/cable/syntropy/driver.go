@@ -64,6 +64,8 @@ func init() {
 }
 
 type specification struct {
+	PSK      string `default:"default psk"`
+	NATTPort int    `default:"4500"`
 }
 
 type wireguard struct {
@@ -167,11 +169,6 @@ func (w *wireguard) GetName() string {
 }
 
 func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo) (string, error) {
-	d, err := w.client.Device(DefaultDeviceName)
-	if err != nil {
-		return "", fmt.Errorf("wgctrl cannot find WireGuard device: %v", err)
-	}
-
 	remoteEndpoint := &endpointInfo.Endpoint
 	ip := endpointInfo.UseIP
 
@@ -186,26 +183,31 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 		return "", fmt.Errorf("failed to parse remote IP %s", ip)
 	}
 
-	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s",
-		remoteEndpoint.Spec.ClusterID, remoteIP)
+	// parse remote public key
+	remoteKey, err := keyFromSpec(&remoteEndpoint.Spec)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse peer public key: %v", err)
+	}
+
+	klog.V(log.DEBUG).Infof("Connecting cluster %s endpoint %s with publicKey %s",
+		remoteEndpoint.Spec.ClusterID, remoteIP, remoteKey)
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 
-	var remotePeer wgtypes.Peer
-	for _, peer := range d.Peers {
-		c := 0
-		if peer.Endpoint.IP.String() == ip {
-			c++
-			remotePeer = peer
-		}
-		if c == 0 {
-			return "", fmt.Errorf("no peer available for %s", ip)
-		}
-	}
-
 	// delete or update old peers for ClusterID
-	_, found := w.connections[remoteEndpoint.Spec.ClusterID]
+	oldCon, found := w.connections[remoteEndpoint.Spec.ClusterID]
 	if found {
+		if oldKey, err := keyFromSpec(&oldCon.Endpoint); err == nil {
+			if oldKey.String() == remoteKey.String() {
+				// existing connection, update status and skip
+				w.updatePeerStatus(oldCon, oldKey)
+				klog.V(log.DEBUG).Infof("Skipping connect for existing peer key %s", oldKey)
+
+				return ip, nil
+			}
+
+		}
+
 		delete(w.connections, remoteEndpoint.Spec.ClusterID)
 	}
 
@@ -215,17 +217,15 @@ func (w *wireguard) ConnectToEndpoint(endpointInfo *natdiscovery.NATEndpointInfo
 	klog.V(log.DEBUG).Infof("Adding connection for cluster %s, %v", remoteEndpoint.Spec.ClusterID, connection)
 	w.connections[remoteEndpoint.Spec.ClusterID] = connection
 
-	// configure peer (syntropy is in charge)
-
 	// verify peer was added
-	if p, err := w.peerByKey(&remotePeer.PublicKey); err != nil {
+	if p, err := w.peerByKey(remoteKey); err != nil {
 		klog.Errorf("Failed to verify peer configuration: %v", err)
 	} else {
 		// TODO verify configuration
 		klog.V(log.DEBUG).Infof("Peer configured, PubKey:%s, EndPoint:%s, AllowedIPs:%v", p.PublicKey, p.Endpoint, p.AllowedIPs)
 	}
 
-	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %s", remoteIP)
+	klog.V(log.DEBUG).Infof("Done connecting endpoint peer %s@%s", *remoteKey, remoteIP)
 
 	cable.RecordConnection(cableDriverName, &w.localEndpoint.Spec, &connection.Endpoint, string(v1.Connected), true)
 
@@ -268,13 +268,6 @@ func (w *wireguard) DisconnectFromEndpoint(remoteEndpoint types.SubmarinerEndpoi
 func (w *wireguard) GetActiveConnections() ([]v1.Connection, error) {
 	// force caller to skip duplicate handling
 	return make([]v1.Connection, 0), nil
-}
-
-func (w *wireguard) removePeer(key *wgtypes.Key) error {
-	// do nothing.. all connections are managed by syntropy agent
-	klog.V(log.DEBUG).Infof("Done removing WireGuard peer with key %s", key)
-
-	return nil
 }
 
 func (w *wireguard) peerByKey(key *wgtypes.Key) (*wgtypes.Peer, error) {

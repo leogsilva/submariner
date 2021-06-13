@@ -28,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/submariner-io/admiral/pkg/log"
 	"github.com/submariner-io/admiral/pkg/stringset"
+	"github.com/submariner-io/submariner/pkg/cable/syntropy"
 	"github.com/submariner-io/submariner/pkg/node"
 	"github.com/submariner-io/submariner/pkg/util"
 	v1 "k8s.io/api/core/v1"
@@ -40,6 +41,16 @@ import (
 
 func GetLocal(submSpec types.SubmarinerSpecification, k8sClient kubernetes.Interface) (types.SubmarinerEndpoint, error) {
 	privateIP := util.GetLocalIP()
+	klog.Infof("Cable driver used is: %s", submSpec.CableDriver)
+	if submSpec.CableDriver == "syntropy" {
+		ip, err := util.GetInterfaceIpv4Addr(syntropy.DefaultDeviceName)
+		if err != nil {
+			klog.Warningf("Could not retrieve ip for syntropy: %s", err.Error())
+		} else {
+			klog.Infof("New private ip set to: %s", ip)
+			privateIP = ip
+		}
+	}
 
 	gwNode, err := node.GetLocalNode(k8sClient)
 	if err != nil {

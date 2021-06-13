@@ -115,7 +115,7 @@ func main() {
 		klog.Fatalf("Error creating Kubernetes clientset: %s", err.Error())
 	}
 
-	klog.Info("Creating the cable engine")
+	klog.Info("Creating the cable engine .......")
 
 	localCluster := submarinerClusterFrom(&submSpec)
 
